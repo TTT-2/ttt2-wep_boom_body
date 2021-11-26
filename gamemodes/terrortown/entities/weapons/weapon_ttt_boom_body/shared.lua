@@ -1,5 +1,7 @@
 if SERVER then
 	AddCSLuaFile()
+
+	resource.AddFile("materials/vgui/ttt/icon_boom_body.vmt")
 end
 
 SWEP.Base = "weapon_tttbase"
