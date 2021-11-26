@@ -1,0 +1,12 @@
+{
+	"title"		:	"[TTT2] Boom Body [WEAPON]",
+	"type"		:	"effects",
+    "tags"		:	[ "realism", "fun" ],
+    "ignore"    : [
+        ".git/*",
+        ".gitignore",
+		".gitattributes",
+        "README.md",
+		"ttt2-wep_boom_body.jpg"
+    ]
+}
