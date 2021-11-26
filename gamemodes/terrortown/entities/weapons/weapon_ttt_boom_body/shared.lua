@@ -176,7 +176,7 @@ if SERVER then
 		owner:StripWeapon(self:GetClass())
 	end
 
-	hook.Add("TTTCanSearchCorpse", "BoomBodySearchCorpse", function(ply, rag, isCovert, isLongRange)
+	hook.Add("TTTCanSearchCorpse", "BoomBodySearchCorpse", function(ply, rag, isCovert)
 		if not rag.isBoomBody then return end
 
 		if ply:IsSpec() then
@@ -185,7 +185,7 @@ if SERVER then
 			return false
 		end
 
-		if ply == rag:GetNWEntity("boom_body_owner") then
+		if ply == rag:GetNWEntity("boom_body_owner") and isCovert then
 			ply:SafePickupWeaponClass("weapon_ttt_boom_body", true)
 
 			RemoveBoomBody(rag)
@@ -214,6 +214,11 @@ if SERVER then
 		end
 	end)
 else --CLIENT
+	local key_params = {
+		usekey = Key("+use", "USE"),
+		walkkey = Key("+walk", "WALK")
+	}
+
 	net.Receive("BoomBodyUpdateRadar", function()
 		local idx = net.ReadUInt(16)
 
@@ -221,7 +226,7 @@ else --CLIENT
 			RADAR.bombs[idx] = {
 				pos = net.ReadVector(),
 				team = net.ReadString(),
-				nick = "Boom Body"
+				nick = LANG.TryTranslation("ttt2_weapon_boom_body")
 			}
 		else
 			RADAR.bombs[idx] = nil
@@ -244,18 +249,22 @@ else --CLIENT
 
 		if client == ent:GetNWEntity("boom_body_owner") then
 			tData:AddDescriptionLine(
-				LANG.GetTranslation("boom_body_own_ragdoll"),
+				LANG.GetParamTranslation("boom_body_own_ragdoll", key_params),
 				COLOR_ORANGE
 			)
-		end
-
-		if bbRadar and bbRadar.team == client:GetTeam() then
+		elseif bbRadar and bbRadar.team == client:GetTeam() then
 			tData:AddDescriptionLine(
 				LANG.GetTranslation("boom_body_warn_ragdoll"),
 				COLOR_ORANGE
 			)
 		end
 	end)
+
+	function SWEP:Initialize()
+		self:AddTTT2HUDHelp("boom_body_help_msb1")
+
+		return self.BaseClass.Initialize(self)
+	end
 end
 
 
