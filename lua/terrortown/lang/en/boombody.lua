@@ -6,3 +6,6 @@ L["boom_body_own_ragdoll"] = "This is your own boom body. Safely pick it up by p
 L["boom_body_warn_ragdoll"] = "This is a boom body placed by a teammate. Be careful!"
 
 L["boom_body_help_msb1"] = "Drops the boom body on the floor"
+
+L["label_boom_body_allow_pickup"] = "Allow boom body placer to pick it up again"
+L["label_boom_body_spawn_blood"] = "Spawn blood around placed boom body"

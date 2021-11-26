@@ -53,10 +53,14 @@ SWEP.Weight = 5
 
 game.AddDecal("chalk_outline", "decals/decal_chalk_outline")
 
+local cvAllowPickup = CreateConVar("ttt2_boom_body_allow_pickup", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
+
 if SERVER then
 	util.AddNetworkString("BoomBodyUpdateRadar")
 
-	throwsound = Sound("Weapon_SLAM.SatchelThrow")
+	local soundThrow = Sound("Weapon_SLAM.SatchelThrow")
+
+	local cvSpawnBlood = CreateConVar("ttt2_boom_body_spawn_blood", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
 
 	local function UpdateRadar(state, rag)
 		if not IsValid(rag) then return end
@@ -86,7 +90,7 @@ if SERVER then
 
 	local function ExplodeBoomBody(rag)
 		local posRag = rag:GetPos() + rag:OBBCenter()
-		local radius = 120
+		local radius = 160
 
 		local tr = util.TraceLine({
 			start = posRag,
@@ -153,19 +157,21 @@ if SERVER then
 		rag.isBoomBody = true
 		rag:SetNWEntity("boom_body_owner", owner)
 
-		self:EmitSound(throwsound)
+		self:EmitSound(soundThrow)
 		self:SendWeaponAnim(ACT_VM_SECONDARYATTACK)
 
 		-- spawn blood decals
-		timer.Create("ragdoll_blood_decals_" .. rag:EntIndex(), 0.15, 15, function()
-			if not IsValid(rag) then return end
+		if cvSpawnBlood:GetBool() then
+			timer.Create("ragdoll_blood_decals_" .. rag:EntIndex(), 0.15, 15, function()
+				if not IsValid(rag) then return end
 
-			local jitter = VectorRand() * 25
+				local jitter = VectorRand() * 25
 
-			jitter.z = 10
+				jitter.z = 10
 
-			util.PaintDown(rag:GetPos() + rag:OBBCenter() + jitter, "Blood", rag)
-		end)
+				util.PaintDown(rag:GetPos() + rag:OBBCenter() + jitter, "Blood", rag)
+			end)
+		end
 
 		-- cache ragdolls on owener
 		owner.boomBodyCache = owner.boomBodyCache or {}
@@ -187,7 +193,7 @@ if SERVER then
 			return false
 		end
 
-		if ply == rag:GetNWEntity("boom_body_owner") and isCovert then
+		if ply == rag:GetNWEntity("boom_body_owner") and isCovert and cvAllowPickup:GetBool() then
 			ply:SafePickupWeaponClass("weapon_ttt_boom_body", true)
 
 			RemoveBoomBody(rag)
@@ -249,7 +255,7 @@ else --CLIENT
 
 		local bbRadar = RADAR.bombs[ent:EntIndex()]
 
-		if client == ent:GetNWEntity("boom_body_owner") then
+		if client == ent:GetNWEntity("boom_body_owner") and cvAllowPickup:GetBool() then
 			tData:AddDescriptionLine(
 				LANG.GetParamTranslation("boom_body_own_ragdoll", key_params),
 				COLOR_ORANGE
@@ -266,6 +272,20 @@ else --CLIENT
 		self:AddTTT2HUDHelp("boom_body_help_msb1")
 
 		return self.BaseClass.Initialize(self)
+	end
+
+	function SWEP:AddToSettingsMenu(parent)
+		local form = vgui.CreateTTT2Form(parent, "header_equipment_additional")
+
+		form:MakeCheckBox({
+			serverConvar = "ttt2_boom_body_allow_pickup",
+			label = "label_boom_body_allow_pickup"
+		})
+
+		form:MakeCheckBox({
+			serverConvar = "ttt2_boom_body_spawn_blood",
+			label = "label_boom_body_spawn_blood"
+		})
 	end
 end
 
