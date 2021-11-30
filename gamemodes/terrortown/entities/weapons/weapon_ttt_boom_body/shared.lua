@@ -151,11 +151,13 @@ if SERVER then
 		dmg:SetDamageType(DMG_BULLET)
 
 		local rag = CORPSE.Create(ply, owner, dmg)
-		CORPSE.SetCredits(rag, 0)
-		rag.killer_sample = nil
 
-		rag.isBoomBody = true
+		rag:SetPos(owner:GetPos())
 		rag:SetNWEntity("boom_body_owner", owner)
+		rag.killer_sample = nil
+		rag.isBoomBody = true
+
+		CORPSE.SetCredits(rag, 0)
 
 		self:EmitSound(soundThrow)
 		self:SendWeaponAnim(ACT_VM_SECONDARYATTACK)
