@@ -59,6 +59,7 @@ if SERVER then
 	util.AddNetworkString("BoomBodyUpdateRadar")
 
 	local soundThrow = Sound("Weapon_SLAM.SatchelThrow")
+	local soundThrow1 = Sound("vo/npc/male01/pain07.wav")
 
 	local cvSpawnBlood = CreateConVar("ttt2_boom_body_spawn_blood", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
 
@@ -150,16 +151,16 @@ if SERVER then
 		dmg:SetDamage(10)
 		dmg:SetDamageType(DMG_BULLET)
 
-		local rag = CORPSE.Create(ply, owner, dmg)
+		local rag = CORPSE.Create(owner, ply, dmg)
 
-		rag:SetPos(owner:GetPos())
 		rag:SetNWEntity("boom_body_owner", owner)
 		rag.killer_sample = nil
 		rag.isBoomBody = true
 
 		CORPSE.SetCredits(rag, 0)
 
-		self:EmitSound(soundThrow)
+		rag:EmitSound(soundThrow)
+		rag:EmitSound(soundThrow1)
 		self:SendWeaponAnim(ACT_VM_SECONDARYATTACK)
 
 		-- spawn blood decals
@@ -175,7 +176,7 @@ if SERVER then
 			end)
 		end
 
-		-- cache ragdolls on owener
+		-- cache ragdolls on owner
 		owner.boomBodyCache = owner.boomBodyCache or {}
 		owner.boomBodyCache[rag] = true
 
