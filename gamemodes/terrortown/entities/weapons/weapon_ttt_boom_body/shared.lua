@@ -54,12 +54,16 @@ SWEP.Weight = 5
 game.AddDecal("chalk_outline", "decals/decal_chalk_outline")
 
 local cvAllowPickup = CreateConVar("ttt2_boom_body_allow_pickup", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
+local cvPainSound = CreateConVar("ttt2_boom_body_pain_sound", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
+local cvExplosionDelay = CreateConVar("ttt2_boom_body_explosion_delay", "0", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
+local cvExplosionDelayPolicing = CreateConVar("ttt2_boom_body_explosion_delay_policing", "0", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
 
 if SERVER then
 	util.AddNetworkString("BoomBodyUpdateRadar")
 
 	local soundThrow = Sound("Weapon_SLAM.SatchelThrow")
 	local soundThrow1 = Sound("vo/npc/male01/pain07.wav")
+	local soundPreExplosion = Sound("weapons/c4/c4_beep1.wav")
 
 	local cvSpawnBlood = CreateConVar("ttt2_boom_body_spawn_blood", "1", {FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED})
 
@@ -160,7 +164,9 @@ if SERVER then
 		CORPSE.SetCredits(rag, 0)
 
 		rag:EmitSound(soundThrow)
-		rag:EmitSound(soundThrow1)
+		if cvPainSound:GetBool() then
+			rag:EmitSound(soundThrow1)
+		end
 		self:SendWeaponAnim(ACT_VM_SECONDARYATTACK)
 
 		-- spawn blood decals
@@ -204,7 +210,20 @@ if SERVER then
 			return false
 		end
 
-		ExplodeBoomBody(rag)
+		local delay = cvExplosionDelay:GetFloat()
+		if ply:GetSubRoleData().isPolicingRole then
+			delay = delay + cvExplosionDelayPolicing:GetFloat()
+		end
+
+		if delay > 0 then
+			rag:EmitSound(soundPreExplosion)
+			timer.Simple(delay, function()
+				if not IsValid(rag) then return end
+				ExplodeBoomBody(rag)
+			end)
+		else
+			ExplodeBoomBody(rag)
+		end
 
 		return false
 	end)

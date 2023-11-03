@@ -11,3 +11,6 @@ L["boom_body_help_msb1"] = "Drops the boom body on the floor"
 
 L["label_boom_body_allow_pickup"] = "Allow boom body placer to pick it up again"
 L["label_boom_body_spawn_blood"] = "Spawn blood around placed boom body"
+L["label_boom_body_explosion_delay"] = "Delay in seconds before the boom body explodes"
+L["label_boom_body_explosion_delay_policing"] = "Additional delay if triggered by a Detective"
+L["label_boom_body_pain_sound"] = "Play a scream sound effect when placing the boom body"
