@@ -71,52 +71,29 @@ local cvExplosionDelayPolicing = CreateConVar(
     { FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED }
 )
 
-if SERVER then
-    util.AddNetworkString("BoomBodyUpdateRadar")
+function SWEP:PrimaryAttack()
+    self:SetNextPrimaryFire(CurTime() + self.Primary.Delay)
 
+    if CLIENT or not self:CanPrimaryAttack() then
+        return
+    end
+
+    self:SpawnBoomBody()
+end
+
+function SWEP:SecondaryAttack() end
+
+if SERVER then
     local soundThrow = Sound("Weapon_SLAM.SatchelThrow")
     local soundThrow1 = Sound("vo/npc/male01/pain07.wav")
     local soundPreExplosion = Sound("weapons/c4/c4_beep1.wav")
+    local soundDeny = Sound("HL2Player.UseDeny")
 
     local cvSpawnBlood = CreateConVar(
         "ttt2_boom_body_spawn_blood",
         "1",
         { FCVAR_NOTIFY, FCVAR_ARCHIVE, FCVAR_REPLICATED }
     )
-
-    local function UpdateRadar(state, rag)
-        if not IsValid(rag) then
-            return
-        end
-
-        local owner = rag:GetNWEntity("boom_body_owner")
-
-        if not IsValid(owner) or GetRoundState() ~= ROUND_ACTIVE then
-            return
-        end
-
-        net.Start("BoomBodyUpdateRadar")
-
-        net.WriteUInt(rag:EntIndex(), 16)
-        net.WriteBool(state)
-
-        if state then
-            net.WriteVector(rag:GetPos())
-            net.WriteString(owner:GetTeam())
-        end
-
-        net.Broadcast()
-    end
-
-    local function RemoveBoomBody(rag)
-        local owner = rag:GetNWEntity("boom_body_owner")
-
-        owner.boomBodyCache[rag] = nil
-
-        UpdateRadar(false, rag)
-
-        rag:Remove()
-    end
 
     local function ExplodeBoomBody(rag)
         local posRag = rag:GetPos() + rag:OBBCenter()
@@ -166,7 +143,9 @@ if SERVER then
             { rag }
         )
 
-        RemoveBoomBody(rag)
+        rag:RemoveMarkerVision("boombody_owner")
+
+        rag:Remove()
     end
 
     function SWEP:SelectBoomBodyPlayer()
@@ -215,12 +194,10 @@ if SERVER then
             end)
         end
 
-        -- cache ragdolls on owner
-        owner.boomBodyCache = owner.boomBodyCache or {}
-        owner.boomBodyCache[rag] = true
-
-        -- update the bomb radar for the team mates
-        UpdateRadar(true, rag)
+        local mvObject = rag:AddMarkerVision("boombody_owner")
+        mvObject:SetOwner(owner)
+        mvObject:SetVisibleFor(VISIBLE_FOR_TEAM)
+        mvObject:SyncToClients()
 
         -- remove the weapon from the inventory
         self:Remove()
@@ -238,9 +215,21 @@ if SERVER then
         end
 
         if ply == rag:GetNWEntity("boom_body_owner") and isCovert and cvAllowPickup:GetBool() then
-            ply:SafePickupWeaponClass("weapon_ttt_boom_body", true)
+            local wep = ply:SafePickupWeaponClass("weapon_ttt_boom_body", true)
 
-            RemoveBoomBody(rag)
+            -- if pickup has failed, the in-world entity should not be removed
+            if not IsValid(wep) then
+                LANG.Msg(activator, "pickup_no_room", nil, MSG_MSTACK_WARN)
+
+                ply:EmitSound(soundDeny)
+
+                return false
+            end
+
+            ply:SelectWeapon("weapon_ttt_boom_body")
+
+            rag:RemoveMarkerVision("boombody_owner")
+            rag:Remove()
 
             return false
         end
@@ -252,10 +241,12 @@ if SERVER then
 
         if delay > 0 then
             rag:EmitSound(soundPreExplosion)
+
             timer.Simple(delay, function()
                 if not IsValid(rag) then
                     return
                 end
+
                 ExplodeBoomBody(rag)
             end)
         else
@@ -264,45 +255,18 @@ if SERVER then
 
         return false
     end)
+end -- SERVER
 
-    hook.Add("TTT2UpdateTeam", "BoomBodyOwnerChangesTeam", function(ply)
-        if not ply.boomBodyCache then
-            return
-        end
+if CLIENT then
+    local TryT = LANG.TryTranslation
+    local ParT = LANG.GetParamTranslation
 
-        for rag in pairs(ply.boomBodyCache) do
-            UpdateRadar(true, rag)
-        end
-    end)
-
-    hook.Add("TTTPrepareRound", "BoomBodyCacheReset", function()
-        local plys = player.GetAll()
-
-        for i = 1, #plys do
-            plys[i].boomBodyCache = nil
-        end
-    end)
-else --CLIENT
     local key_params = {
         usekey = Key("+use", "USE"),
         walkkey = Key("+walk", "WALK"),
     }
 
-    net.Receive("BoomBodyUpdateRadar", function()
-        local idx = net.ReadUInt(16)
-
-        if net.ReadBool() then
-            RADAR.bombs[idx] = {
-                pos = net.ReadVector(),
-                team = net.ReadString(),
-                nick = LANG.TryTranslation("ttt2_weapon_boom_body"),
-            }
-        else
-            RADAR.bombs[idx] = nil
-        end
-
-        RADAR.bombs_count = table.Count(RADAR.bombs)
-    end)
+    local materialBoomBody = Material("vgui/ttt/marker_vision/boombody")
 
     hook.Add("TTTRenderEntityInfo", "BoomBodyTargetID", function(tData)
         local client = LocalPlayer()
@@ -318,16 +282,36 @@ else --CLIENT
             return
         end
 
-        local bbRadar = RADAR.bombs[ent:EntIndex()]
-
         if client == ent:GetNWEntity("boom_body_owner") and cvAllowPickup:GetBool() then
-            tData:AddDescriptionLine(
-                LANG.GetParamTranslation("boom_body_own_ragdoll", key_params),
-                COLOR_ORANGE
-            )
-        elseif bbRadar and bbRadar.team == client:GetTeam() then
-            tData:AddDescriptionLine(LANG.GetTranslation("boom_body_warn_ragdoll"), COLOR_ORANGE)
+            tData:AddDescriptionLine(ParT("boom_body_own_ragdoll", key_params), COLOR_ORANGE)
+        elseif markerVision.Get(ent, "boombody_owner") then
+            tData:AddDescriptionLine(TryT("boom_body_warn_ragdoll"), COLOR_ORANGE)
         end
+    end)
+
+    hook.Add("TTT2RenderMarkerVisionInfo", "HUDDrawMarkerVisionBoomBody", function(mvData)
+        local client = LocalPlayer()
+        local ent = mvData:GetEntity()
+        local mvObject = mvData:GetMarkerVisionObject()
+
+        if not client:IsTerror() or not mvObject:IsObjectFor(ent, "boombody_owner") then
+            return
+        end
+
+        local owner = ent:GetNWEntity("boom_body_owner")
+        local nick = IsValid(owner) and owner:Nick() or "---"
+
+        local distance = math.Round(util.HammerUnitsToMeters(mvData:GetEntityDistance()), 1)
+
+        mvData:EnableText()
+
+        mvData:AddIcon(materialBoomBody)
+        mvData:SetTitle(TryT("ttt2_weapon_boom_body"))
+
+        mvData:AddDescriptionLine(ParT("marker_vision_owner", { owner = nick }))
+        mvData:AddDescriptionLine(ParT("marker_vision_distance", { distance = distance }))
+
+        mvData:AddDescriptionLine(TryT(mvObject:GetVisibleForTranslationKey()), COLOR_SLATEGRAY)
     end)
 
     function SWEP:Initialize()
@@ -373,13 +357,3 @@ else --CLIENT
         })
     end
 end
-
-function SWEP:PrimaryAttack()
-    if CLIENT or not self:CanPrimaryAttack() then
-        return
-    end
-
-    self:SpawnBoomBody()
-end
-
-function SWEP:SecondaryAttack() end
