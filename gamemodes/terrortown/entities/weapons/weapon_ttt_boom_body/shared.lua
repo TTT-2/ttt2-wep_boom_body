@@ -89,6 +89,12 @@ if SERVER then
             return
         end
 
+        local owner = rag:GetNWEntity("boom_body_owner")
+
+        if not IsValid(owner) or GetRoundState() ~= ROUND_ACTIVE then
+            return
+        end
+
         net.Start("BoomBodyUpdateRadar")
 
         net.WriteUInt(rag:EntIndex(), 16)
@@ -96,7 +102,7 @@ if SERVER then
 
         if state then
             net.WriteVector(rag:GetPos())
-            net.WriteString(rag:GetNWEntity("boom_body_owner"):GetTeam())
+            net.WriteString(owner:GetTeam())
         end
 
         net.Broadcast()
