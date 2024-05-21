@@ -145,6 +145,8 @@ if SERVER then
 
         rag:RemoveMarkerVision("boombody_owner")
 
+        hook.Run("TTT2BoomBodyOnExplode", rag)
+
         rag:Remove()
     end
 
